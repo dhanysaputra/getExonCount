@@ -29,7 +29,9 @@ else:
 	# Connect to DB
     db = MySQLdb.connect(sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6])
     cursor=db.cursor()
-    
+    alone=0
+    multiple=0
+
     for i in xrange(1,23):
         exon={}
         print >> sys.stderr, "Processing Chromosome #"+str(i)
@@ -37,6 +39,7 @@ else:
         cursor.execute("SELECT SQL_CACHE region_id,exon_name,start,cigar,end FROM human where Chromosome='\"chr"+str(i)+"\"' order by start")
         text=cursor.fetchall()
         header=''
+	flag_counter=0
         for line in file(fileinput+".chr"+str(i), 'rU'):
             pos=int(line.split('\t')[3])
             idx=recurse(pos,0,len(text))
@@ -57,14 +60,22 @@ else:
             # IF it's the new pair, treat as first pair, count, save for next loop
             if header!=line.split('\t')[0].split('.')[1]:
                 header=line.split('\t')[0].split('.')[1]
-                exon_txt=""
-                gene_txt=""
-                oldpos=0
-		# get exon & region name if the cigar match
-                if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
-                    exon_txt=text[idx][1]
-                    gene_txt=text[idx][0]
-                    oldpos=pos
+		# doesnt have couple
+                if flag_counter==1:
+                    alone+=1
+                # a pair consist of more than 2 reads, or multiple aligned
+                elif flag_counter>2:
+                    multiple+=1
+                else:
+                	exon_txt=""
+                	gene_txt=""
+                	oldpos=0
+			# get exon & region name if the cigar match
+                	if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
+                	    exon_txt=text[idx][1]
+                	    gene_txt=text[idx][0]
+                	    oldpos=pos
+		flag_counter=1
             # ELSE IF the first pair has been counted
             else:
                 if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
@@ -84,6 +95,7 @@ else:
                         # for debugging, uncomment these
                         # if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_9.ex_9__17850':
                         #    f.write(line)
+		flag_counter+=1
         # print exon-pair name and the counts
 	for k in exon.keys():
             f.write(str(k)+"\t"+str(exon[k])+"\n")
@@ -95,6 +107,7 @@ else:
     cursor.execute("SELECT SQL_CACHE region_id,exon_name,start,cigar,end FROM human where Chromosome='\"chrX\"' order by start")
     text=cursor.fetchall()
     header=''
+    flag_counter=0
     for line in file(fileinput+".chrX", 'rU'):
         pos=int(line.split('\t')[3])
         idx=recurse(pos,0,len(text))
@@ -110,13 +123,21 @@ else:
                 continue
         if header!=line.split('\t')[0].split('.')[1]:
             header=line.split('\t')[0].split('.')[1]
-            exon_txt=""
-            gene_txt=""
-            oldpos=0
-            if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
-                exon_txt=text[idx][1]
-                gene_txt=text[idx][0]
-                oldpos=pos
+	    # doesnt have couple
+            if flag_counter==1:
+                alone+=1
+	    # a pair consist of more than 2 reads, or multiple aligned
+            elif flag_counter>2:
+                multiple+=1
+            else:
+                exon_txt=""
+                gene_txt=""
+                oldpos=0
+                if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
+                    exon_txt=text[idx][1]
+                    gene_txt=text[idx][0]
+                    oldpos=pos
+	    flag_counter=1
         else:
             if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
                 if oldpos<pos:
@@ -133,6 +154,7 @@ else:
                         exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]=1
                     # if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_3.ex_3__19479':
                     #    f.write(line)
+	    flag_counter+=1
     for k in exon.keys():
         f.write(str(k)+"\t"+str(exon[k])+"\n")
 
@@ -157,13 +179,29 @@ else:
                 continue
         if header!=line.split('\t')[0].split('.')[1]:
             header=line.split('\t')[0].split('.')[1]
-            exon_txt=""
+            # doesnt have couple
+            if flag_counter==1:
+                alone+=1
+	    # a pair consist of more than 2 reads, or multiple aligned
+            elif flag_counter>2:
+                multiple+=1
+            else:
+                exon_txt=""
+                gene_txt=""
+                oldpos=0
+                if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
+                    exon_txt=text[idx][1]
+                    gene_txt=text[idx][0]
+                    oldpos=pos
+	    flag_counter=1
+	    exon_txt=""
             gene_txt=""
             oldpos=0
             if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
                 exon_txt=text[idx][1]
                 gene_txt=text[idx][0]
                 oldpos=pos
+	    flag_counter=1
         else:
             if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
                 if oldpos<pos:
@@ -180,6 +218,7 @@ else:
                         exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]=1
                     #if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_3.ex_3__19479':
                     #    f.write(line)
+	    flag_counter+=1
     for k in exon.keys():
         f.write(str(k)+"\t"+str(exon[k])+"\n")
 print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
