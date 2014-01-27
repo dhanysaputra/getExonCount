@@ -23,7 +23,7 @@ def helpme():
     print '         outputfile\tthe count will be outputted to this file'
     print '         sqlitefile\tThe sqlite of txdb'
     print ''
-    print 'Example: python getPairCount.py human1 outputCount.txt hg18.sqlite'
+    print 'Example: python getPairCount.py tumor outputCount.txt hg18.sqlite'
     print ''
 
 if len(sys.argv)<3 or sys.argv[1]=='--help':
