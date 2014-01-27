@@ -19,7 +19,7 @@ def helpme():
     print ''
     print 'Usage: python getPairCount.py <inputprefix> <outputfile> <sqlitefile>'
     print ''
-    print 'Command: inputprefix\tIf the input files are human1.chr1, ..., human1.chrY, then inputprefix is human1'
+    print 'Command: inputprefix\tIf the input files are tumor.chr1, ..., tumor.chrY, then inputprefix is tumor'
     print '         outputfile\tthe count will be outputted to this file'
     print '         sqlitefile\tThe sqlite of txdb'
     print ''
