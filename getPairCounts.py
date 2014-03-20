@@ -1,5 +1,4 @@
 import sys
-#import MySQLdb
 import sqlite3
 from datetime import datetime
 
@@ -12,197 +11,309 @@ def recurse(a,n1,n2):
             return recurse(a,n1,int((n2-n1)/2)+n1)
         else:
             return recurse(a,int((n2-n1)/2)+n1,n2)
-
+        
 def helpme():
-    print ''
-    print 'Program: getPairCount.py (Tools for counting the mapped exons)'
-    print ''
-    print 'Usage: python getPairCount.py <inputprefix> <outputfile> <sqlitefile>'
-    print ''
-    print 'Command: inputprefix\tIf the input files are tumor.chr1, ..., tumor.chrY, then inputprefix is tumor'
-    print '         outputfile\tthe count will be outputted to this file'
-    print '         sqlitefile\tThe sqlite of txdb'
-    print ''
-    print 'Example: python getPairCount.py tumor outputCount.txt hg18.sqlite'
-    print ''
+	print ''
+	print 'Program: getPairCount.py (Tools for counting the mapped exons)'
+	print ''
+	print 'Usage: python getPairCount.py <inputprefix> <outputfile> <sqlitefile>'
+	print ''
+	print 'Command: inputprefix\tIf the input files are human1.chr1, ..., human1.chrY, then inputprefix is human1'
+	print '         outputfile\tthe count will be outputted to this file'
+	print '         sqlitefile\tThe sqlite of txdb'
+	print ''
+	print 'Example: python getPairCount.py human1 outputCount.txt hg18.sqlite'
+	print ''
 
 if len(sys.argv)<3 or sys.argv[1]=='--help':
-        helpme()
+	helpme()
 else:
-    #f=open("deleteme21.txt", "a")
-    f=open(sys.argv[2], "a")
-    #fileinput="reg"
-    fileinput=sys.argv[1]
+	f=open(sys.argv[2], "a")
+	fileinput=sys.argv[1]
 
     # Connect to DB
-    db = sqlite3.connect(sys.argv[3])
-    #db = MySQLdb.connect("D0069MEB.meb.ki.se", "everyone", "password", "dhany")
-    cursor=db.cursor()
-    alone=0
-    multiple=0
-    for i in xrange(1,24):
-        exon={}
-        print >> sys.stderr, "Processing Chromosome #"+str(i)
-        print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg18 where Chromosome='\"chr"+str(i)+"\"' order by start")
-        text=cursor.fetchall()
-        header=''
-        flag_counter=0
-        for line in file(fileinput+".chr"+str(i), 'rU'):
-            pos=int(line.split('\t')[3])
-            idx=recurse(pos,0,len(text))
-            if idx<len(text)-1:
-                newidx=idx
-                while text[newidx+1][2]==text[newidx][2]:
-                    newidx+=1
-                if int(line.split('\t')[3])+5>text[newidx+1][2] and int(line.split('\t')[3])+5<text[newidx][2] and int(line.split('\t')[3])+5<text[newidx][4]:
-                    idx=newidx+1
-                    newidx=-1
-                if int(line.split('\t')[3])+5<text[newidx+1][2] and int(line.split('\t')[3])+5>text[newidx][4]:
-                    newidx=-1
-                    continue
-            if header!=line.split('\t')[0].split('.')[1]:
-                header=line.split('\t')[0].split('.')[1]
-                # doesnt have couple
-                exon_txt=""
-                gene_txt=""
-                oldpos=0
-                if flag_counter==1:
-                    alone+=1
-                # a pair consist of more than 2 reads, or multiple aligned
-                elif flag_counter>2:
-                    multiple+=1
-                if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
-                    exon_txt=text[idx][1]
-                    gene_txt=text[idx][0]
-                    oldpos=pos
-                flag_counter=1
-            else:
-                if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
-                    if oldpos<pos:
-                        try:
-                            exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]+=1
-                        except KeyError:
-                            exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]=1
-                        #if exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                        #    f.write(line)
-                    else:
-                        try:
-                            exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]+=1
-                        except KeyError:
-                            exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]=1
-                        #if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                        #    f.write(line)
+	db = sqlite3.connect(sys.argv[3])
+	cursor=db.cursor()
+	oldpos=-1
+	for i in xrange(1,23):
+		exon={}
+		print >> sys.stderr, "Processing Chromosome #"+str(i)
+		print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+		cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg19 where Chromosome='\"chr"+str(i)+"\"' order by start")
+		text=cursor.fetchall()
+		flag_finish=1
+		temptext=''
+		for line in file(fileinput+".chr"+str(i), 'rU'):
+			if flag_finish==1:
+				temptext=line
+				flag_finish=0
+			else:
+				# Skip counting if there's many N's in cigars
+				if len(line.split('\t')[5].split('N'))<2 and len(temptext.split('\t')[5].split('N'))<2:
+					# Fast search algo for finding exon (Binary Tree)
+					pos1=int(temptext.split('\t')[3])
+					pos2=int(line.split('\t')[3])
+					idx1=recurse(pos1,0,len(text))
+					idx2=recurse(pos2,0,len(text))
+	
+					# Treating exceptional cases: INDELS in cigars!
+					indels1=0
+					indels2=0
+					if 'I' in temptext.split('\t')[5]:
+						for i in xrange(0,len(temptext.split('\t')[5].split('I'))-1):
+							indels1+=int(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+					if 'I' in line.split('\t')[5]:
+						for i in xrange(0,len(line.split('\t')[5].split('I'))-1):
+							indels2+=int(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+					if 'D' in temptext.split('\t')[5]:
+						for i in xrange(0,len(temptext.split('\t')[5].split('D'))-1):
+							indels1-=int(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+					if 'D' in line.split('\t')[5]:
+						for i in xrange(0,len(line.split('\t')[5].split('D'))-1):
+							indels2-=int(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+	
+					# Another exceptional cases: this coordinate is in exon and junction ranges, or weird rows (same exons/junctions, same cigard)!
+					if idx1<len(text)-1:
+						newidx=idx1
+						while text[newidx+1][2]==text[newidx][2]:
+							if ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5]):
+								if (text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+									newidx+=1
+									break
+							newidx+=1
+						if int(temptext.split('\t')[3])+0>=text[newidx+1][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx+1][4]:
+							idx1=newidx+1
+						newidx=-1
+					if idx2<len(text)-1:
+						newidx=idx2
+						while text[newidx+1][2]==text[newidx][2]:
+							if ('N' in text[idx2][3] and 'N' in line.split('\t')[5]):
+								if (text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+									newidx+=1
+									break
+							newidx+=1
+						if int(line.split('\t')[3])+0>=text[newidx+1][2] and int(line.split('\t')[3])+49-indels2<=text[newidx+1][4]:
+							idx2=newidx+1
+						newidx=-1
+					if (('N' not in text[idx1][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[idx1][3] and 'N' not in temptext.split('\t')[5])):
+						newidx=idx1-1
+						while (('N' not in text[newidx][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in temptext.split('\t')[5])):
+							newidx=newidx-1
+						if int(temptext.split('\t')[3])+0>=text[newidx][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx][4]:
+							idx1=newidx
+					if (('N' not in text[idx2][3] and 'N' in line.split('\t')[5]) or ('N' in text[idx2][3] and 'N' not in line.split('\t')[5])):
+						newidx=idx2-1
+						while (('N' not in text[newidx][3] and 'N' in line.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in line.split('\t')[5])):
+							newidx=newidx-1
+						if int(line.split('\t')[3])+0>=text[newidx][2] and int(line.split('\t')[3])+49-indels2<=text[newidx][4]:
+							idx2=newidx
+	
+					# Increment count if both reads fulfil the condition
+					if ('N' not in text[idx1][3] and 'N' not in temptext.split('\t')[5] and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]) or ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5] and text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx1][3].split('M')[0].split('\"')[1])+int(text[idx1][2])==pos1+int(temptext.split('\t')[5].split('M')[0]) and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]):
+						if ('N' not in text[idx2][3] and 'N' not in line.split('\t')[5] and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]) or ('N' in text[idx2][3] and 'N' in line.split('\t')[5] and text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx2][3].split('M')[0].split('\"')[1])+int(text[idx2][2])==pos2+int(line.split('\t')[5].split('M')[0]) and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]):
+	                    				if pos1<pos2:
+								try:
+									exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+								except KeyError:
+									exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+							else:
+								try:
+									exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+								except KeyError:
+									exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+	
+							# UNCOMMENT 4 lines below for debugging only:
+							# debug='ex_3.ex_3__11550'
+							# if text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])==debug or text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])==debug:
+								# f.write(line)
+								# f.write(temptext)
+				temptext=''
+				flag_finish=1
+		# COMMENT both lines below for debugging only:
+		for k in exon.keys():
+			f.write(str(k)+"\t"+str(exon[k])+"\n")
+
+# Chromosome X
+	exon={}
+	print >> sys.stderr, "Processing Chromosome X"
+	print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+	cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg19 where Chromosome='\"chrX\"' order by start")
+	text=cursor.fetchall()
+	flag_finish=1
+	temptext=''
+	for line in file(fileinput+".chrX", 'rU'):
+		if flag_finish==1:
+			temptext=line
+			flag_finish=0
+		else:
+			if len(line.split('\t')[5].split('N'))>1 or len(temptext.split('\t')[5].split('N'))>1:
+				flag_finish=1
+				continue
+			pos1=int(temptext.split('\t')[3])
+			pos2=int(line.split('\t')[3])
+			idx1=recurse(pos1,0,len(text))
+			idx2=recurse(pos2,0,len(text))
+			indels1=0
+			indels2=0
+			if 'I' in temptext.split('\t')[5]:
+				for i in xrange(0,len(temptext.split('\t')[5].split('I'))-1):
+					indels1+=int(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+			if 'I' in line.split('\t')[5]:
+				for i in xrange(0,len(line.split('\t')[5].split('I'))-1):
+					indels2+=int(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+			if 'D' in temptext.split('\t')[5]:
+				for i in xrange(0,len(temptext.split('\t')[5].split('D'))-1):
+					indels1-=int(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+			if 'D' in line.split('\t')[5]:
+				for i in xrange(0,len(line.split('\t')[5].split('D'))-1):
+					indels2-=int(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+			if idx1<len(text)-1:
+				newidx=idx1
+				while text[newidx+1][2]==text[newidx][2]:
+					if ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5]):
+						if (text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+							newidx+=1
+							break
+					newidx+=1
+				if int(temptext.split('\t')[3])+0>=text[newidx+1][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx+1][4]:
+					idx1=newidx+1
+				newidx=-1
+			if idx2<len(text)-1:
+				newidx=idx2
+				while text[newidx+1][2]==text[newidx][2]:
+					if ('N' in text[idx2][3] and 'N' in line.split('\t')[5]):
+						if (text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+							newidx+=1
+							break
+					newidx+=1
+				if int(line.split('\t')[3])+0>=text[newidx+1][2] and int(line.split('\t')[3])+49-indels2<=text[newidx+1][4]:
+					idx2=newidx+1
+				newidx=-1
+			if (('N' not in text[idx1][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[idx1][3] and 'N' not in temptext.split('\t')[5])):
+				newidx=idx1-1
+				while (('N' not in text[newidx][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in temptext.split('\t')[5])):
+					newidx=newidx-1
+				if int(temptext.split('\t')[3])+0>=text[newidx][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx][4]:
+					idx1=newidx
+			if (('N' not in text[idx2][3] and 'N' in line.split('\t')[5]) or ('N' in text[idx2][3] and 'N' not in line.split('\t')[5])):
+				newidx=idx2-1
+				while (('N' not in text[newidx][3] and 'N' in line.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in line.split('\t')[5])):
+					newidx=newidx-1
+				if int(line.split('\t')[3])+0>=text[newidx][2] and int(line.split('\t')[3])+49-indels2<=text[newidx][4]:
+					idx2=newidx
+			if ('N' not in text[idx1][3] and 'N' not in temptext.split('\t')[5] and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]) or ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5] and text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx1][3].split('M')[0].split('\"')[1])+int(text[idx1][2])==pos1+int(temptext.split('\t')[5].split('M')[0]) and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]):
+				if ('N' not in text[idx2][3] and 'N' not in line.split('\t')[5] and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]) or ('N' in text[idx2][3] and 'N' in line.split('\t')[5] and text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx2][3].split('M')[0].split('\"')[1])+int(text[idx2][2])==pos2+int(line.split('\t')[5].split('M')[0]) and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]):
+					if pos1<pos2:
+						try:
+							exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+						except KeyError:
+							exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+					else:
+						try:
+							exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+						except KeyError:
+							exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+					# UNCOMMENT 4 lines below for debugging only:
+					# debug='ex_3.ex_3__11550'
+					# if text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])==debug or text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])==debug:
+						# f.write(line)
+						# f.write(temptext)
+			temptext=''
+			flag_finish=1
+
+	# COMMENT both lines below for debugging only:
+	for k in exon.keys():
+		f.write(str(k)+"\t"+str(exon[k])+"\n")
+	exon={}
+	print >> sys.stderr, "Processing Chromosome Y"
+	print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+	cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg19 where Chromosome='\"chrY\"' order by start")
+	text=cursor.fetchall()
+	flag_finish=1
+	temptext=''
+        for line in file(fileinput+".chrX", 'rU'):
+                if flag_finish==1:
+                        temptext=line
+                        flag_finish=0
+                else:
+                        if len(line.split('\t')[5].split('N'))>1 or len(temptext.split('\t')[5].split('N'))>1:
+                                flag_finish=1
+                                continue
+                        pos1=int(temptext.split('\t')[3])
+                        pos2=int(line.split('\t')[3])
+                        idx1=recurse(pos1,0,len(text))
+                        idx2=recurse(pos2,0,len(text))
+                        indels1=0
+                        indels2=0
+                        if 'I' in temptext.split('\t')[5]:
+                                for i in xrange(0,len(temptext.split('\t')[5].split('I'))-1):
+                                        indels1+=int(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(temptext.split('\t')[5].split('I')[i].split('M')[len(temptext.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+                        if 'I' in line.split('\t')[5]:
+                                for i in xrange(0,len(line.split('\t')[5].split('I'))-1):
+                                        indels2+=int(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D')[len(line.split('\t')[5].split('I')[i].split('M')[len(line.split('\t')[5].split('I')[i].split('M'))-1].split('D'))-1].split('N'))-1])
+                        if 'D' in temptext.split('\t')[5]:
+                                for i in xrange(0,len(temptext.split('\t')[5].split('D'))-1):
+                                        indels1-=int(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(temptext.split('\t')[5].split('D')[i].split('M')[len(temptext.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+                        if 'D' in line.split('\t')[5]:
+                                for i in xrange(0,len(line.split('\t')[5].split('D'))-1):
+                                        indels2-=int(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I')[len(line.split('\t')[5].split('D')[i].split('M')[len(line.split('\t')[5].split('D')[i].split('M'))-1].split('I'))-1].split('N'))-1])
+			if idx1<len(text)-1:
+                                newidx=idx1
+                                while text[newidx+1][2]==text[newidx][2]:
+                                        if ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5]):
+                                                if (text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+                                                        newidx+=1
+                                                        break
+                                        newidx+=1
+                                if int(temptext.split('\t')[3])+0>=text[newidx+1][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx+1][4]:
+                                        idx1=newidx+1
+                                newidx=-1
+                        if idx2<len(text)-1:
+                                newidx=idx2
+                                while text[newidx+1][2]==text[newidx][2]:
+                                        if ('N' in text[idx2][3] and 'N' in line.split('\t')[5]):
+                                                if (text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0]):
+                                                        newidx+=1
+                                                        break
+                                        newidx+=1
+                                if int(line.split('\t')[3])+0>=text[newidx+1][2] and int(line.split('\t')[3])+49-indels2<=text[newidx+1][4]:
+                                        idx2=newidx+1
+                                newidx=-1
+                        if (('N' not in text[idx1][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[idx1][3] and 'N' not in temptext.split('\t')[5])):
+                                newidx=idx1-1
+                                while (('N' not in text[newidx][3] and 'N' in temptext.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in temptext.split('\t')[5])):
+                                        newidx=newidx-1
+                                if int(temptext.split('\t')[3])+0>=text[newidx][2] and int(temptext.split('\t')[3])+49-indels1<=text[newidx][4]:
+                                        idx1=newidx
+                        if (('N' not in text[idx2][3] and 'N' in line.split('\t')[5]) or ('N' in text[idx2][3] and 'N' not in line.split('\t')[5])):
+                                newidx=idx2-1
+                                while (('N' not in text[newidx][3] and 'N' in line.split('\t')[5]) or ('N' in text[newidx][3] and 'N' not in line.split('\t')[5])):
+                                        newidx=newidx-1
+                                if int(line.split('\t')[3])+0>=text[newidx][2] and int(line.split('\t')[3])+49-indels2<=text[newidx][4]:
+                                        idx2=newidx
+                        if ('N' not in text[idx1][3] and 'N' not in temptext.split('\t')[5] and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]) or ('N' in text[idx1][3] and 'N' in temptext.split('\t')[5] and text[idx1][3].split('M')[1].split('N')[0]==temptext.split('\t')[5].split('M')[len(temptext.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx1][3].split('M')[0].split('\"')[1])+int(text[idx1][2])==pos1+int(temptext.split('\t')[5].split('M')[0]) and int(temptext.split('\t')[3])+0>=text[idx1][2] and int(temptext.split('\t')[3])+49-indels1<=text[idx1][4]):
+                                if ('N' not in text[idx2][3] and 'N' not in line.split('\t')[5] and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]) or ('N' in text[idx2][3] and 'N' in line.split('\t')[5] and text[idx2][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[len(line.split('\t')[5].split('N')[0].split('M'))].split('N')[0] and int(text[idx2][3].split('M')[0].split('\"')[1])+int(text[idx2][2])==pos2+int(line.split('\t')[5].split('M')[0]) and text[idx1][0]==text[idx2][0] and int(line.split('\t')[3])+0>=text[idx2][2] and int(line.split('\t')[3])+49-indels2<=text[idx2][4]):
+                                        if pos1<pos2:
+                                                try:
+                                                        exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+                                                except KeyError:
+                                                        exon[text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+                                        else:
+                                                try:
+                                                        exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]+=1
+                                                except KeyError:
+                                                        exon[text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])]=1
+					# UNCOMMENT 4 lines below for debugging only:
+					# debug='ex_3.ex_3__11550'
+					# if text[idx1][1].replace("\"", "")+'.'+text[idx2][1].replace("\"", "")+'__'+str(text[idx1][0])==debug or text[idx2][1].replace("\"", "")+'.'+text[idx1][1].replace("\"", "")+'__'+str(text[idx1][0])==debug:
+						# f.write(line)
+						# f.write(temptext)
+			temptext=''
+			flag_finish=1
+
+	# COMMENT both lines below for debugging only:
         for k in exon.keys():
-            f.write(str(k)+"\t"+str(exon[k])+"\n")
-    exon={}
-    print >> sys.stderr, "Processing Chromosome X"
-    print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg18 where Chromosome='X' order by start")
-    text=cursor.fetchall()
-    header=''
-    flag_counter=0
-    for line in file(fileinput+".chrX", 'rU'):
-        pos=int(line.split('\t')[3])
-        idx=recurse(pos,0,len(text))
-        if idx<len(text)-1:
-            newidx=idx
-            while text[newidx+1][2]==text[newidx][2]:
-                newidx+=1
-            if int(line.split('\t')[3])+5>text[newidx+1][2] and int(line.split('\t')[3])+5<text[newidx][2] and int(line.split('\t')[3])+5<text[newidx][4]:
-                idx=newidx+1
-                newidx=-1
-            if int(line.split('\t')[3])+5<text[newidx+1][2] and int(line.split('\t')[3])+5>text[newidx][4]:
-                newidx=-1
-                continue
-        if header!=line.split('\t')[0].split('.')[1]:
-            header=line.split('\t')[0].split('.')[1]
-            # doesnt have couple
-            exon_txt=""
-            gene_txt=""
-            oldpos=0
-            if flag_counter==1:
-                alone+=1
-            # a pair consist of more than 2 reads, or multiple aligned
-            elif flag_counter>2:
-                multiple+=1
-            if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
-                exon_txt=text[idx][1]
-                gene_txt=text[idx][0]
-                oldpos=pos
-            flag_counter=1
-        else:
-            if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
-                if oldpos<pos:
-                    try:
-                        exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]+=1
-                    except KeyError:
-                        exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]=1
-                    #if exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                    #    f.write(line)
-                else:
-                    try:
-                        exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]+=1
-                    except KeyError:
-                        exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]=1
-                    #if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                    #    f.write(line)
-    for k in exon.keys():
-        f.write(str(k)+"\t"+str(exon[k])+"\n")
-    exon={}
-    print >> sys.stderr, "Processing Chromosome Y"
-    print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute("SELECT region_id,exon_name,start,cigar,end FROM hg18 where Chromosome='Y' order by start")
-    text=cursor.fetchall()
-    header=''
-    flag_counter=0
-    for line in file(fileinput+".chrY", 'rU'):
-        pos=int(line.split('\t')[3])
-        idx=recurse(pos,0,len(text))
-        if idx<len(text)-1:
-            newidx=idx
-            while text[newidx+1][2]==text[newidx][2]:
-                newidx+=1
-            if int(line.split('\t')[3])+5>text[newidx+1][2] and int(line.split('\t')[3])+5<text[newidx][2] and int(line.split('\t')[3])+5<text[newidx][4]:
-                idx=newidx+1
-                newidx=-1
-            if int(line.split('\t')[3])+5<text[newidx+1][2] and int(line.split('\t')[3])+5>text[newidx][4]:
-                newidx=-1
-                continue
-        if header!=line.split('\t')[0].split('.')[1]:
-            header=line.split('\t')[0].split('.')[1]
-            # doesnt have couple
-            exon_txt=""
-            gene_txt=""
-            oldpos=0
-            if flag_counter==1:
-                alone+=1
-            # a pair consist of more than 2 reads, or multiple aligned
-            elif flag_counter>2:
-                multiple+=1
-            if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0]):
-                exon_txt=text[idx][1]
-                gene_txt=text[idx][0]
-                oldpos=pos
-            flag_counter=1
-        else:
-            if ('N' not in text[idx][3] and 'N' not in line.split('\t')[5] and gene_txt==text[idx][0]) or ('N' in text[idx][3] and 'N' in line.split('\t')[5] and text[idx][3].split('M')[1].split('N')[0]==line.split('\t')[5].split('M')[1].split('N')[0] and gene_txt==text[idx][0]):
-                if oldpos<pos:
-                    try:
-                        exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]+=1
-                    except KeyError:
-                        exon[exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)]=1
-                    #if exon_txt.replace("\"", "")+'.'+text[idx][1].replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                    #    f.write(line)
-                else:
-                    try:
-                        exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]+=1
-                    except KeyError:
-                        exon[text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)]=1
-                    #if text[idx][1].replace("\"", "")+'.'+exon_txt.replace("\"", "")+'__'+str(gene_txt)=='ex_5-ex_6.ex_6__15255':
-                    #    f.write(line)
-    for k in exon.keys():
-        f.write(str(k)+"\t"+str(exon[k])+"\n")
-        print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        conn.close()
-        f.close()
+                f.write(str(k)+"\t"+str(exon[k])+"\n")
+	print >> sys.stderr, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+	db.close()
+	f.close()
