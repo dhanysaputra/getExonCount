@@ -2,7 +2,7 @@ module load bioinfo-tools
 module load samtools/0.1.18
 
 # Simple command: bash preprocess.sh file=yourfile.bam
-# example: bash preprocess.sh srr28-29.bam 30 22 tumor
+# Complex command: bash preprocess.sh file=yourfile.bam parallel=12 chr=2,3-8,X
 
 chr=""
 file=""
